@@ -3,7 +3,7 @@ from flask_cors import CORS
 import requests
 import time
 import os
-from analytics import QuestAnalytics
+from analytics_no_pandas import QuestAnalytics
 
 app = Flask(__name__)
 CORS(app)
@@ -39,11 +39,6 @@ def chat():
 • Средняя в день: {stats['avg_daily']:,} ₽
 • За 30 дней: {stats['revenue_last_30']:,} ₽
 
-Ты можешь прогнозировать выручку на конкретные дни с учетом:
-• 📅 Праздников
-• ☁️ Погоды
-• 📊 Исторических данных
-
 Ответь на вопрос: {user_message}"""
     
     now = time.time()
@@ -71,7 +66,6 @@ def chat():
 
 @app.route('/api/stats', methods=['GET'])
 def get_stats():
-    """Общая статистика"""
     try:
         stats = analytics.get_stats()
         return jsonify(stats)
@@ -80,26 +74,14 @@ def get_stats():
 
 @app.route('/api/recent', methods=['GET'])
 def get_recent():
-    """Последние 10 записей"""
     try:
-        df = analytics.df
-        if df.empty:
-            return jsonify([])
-        
-        recent = df.tail(10).sort_values('date', ascending=False)
-        records = []
-        for _, row in recent.iterrows():
-            records.append({
-                'date': row['date'].strftime('%Y-%m-%d'),
-                'revenue': float(row['revenue'])
-            })
-        return jsonify(records)
+        recent = analytics.get_recent(10)
+        return jsonify(recent)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/add_revenue', methods=['POST'])
 def add_revenue():
-    """Добавить выручку"""
     try:
         data = request.get_json()
         
@@ -114,7 +96,6 @@ def add_revenue():
 
 @app.route('/api/day_stats', methods=['GET'])
 def day_stats():
-    """Статистика по конкретному дню"""
     try:
         day = request.args.get('day')
         stats = analytics.get_day_stats(day)
@@ -124,7 +105,6 @@ def day_stats():
 
 @app.route('/api/predict_day', methods=['GET'])
 def predict_day():
-    """Прогноз на будущие даты"""
     try:
         day = request.args.get('day', 'понедельник')
         count = request.args.get('count', 4, type=int)
@@ -136,7 +116,6 @@ def predict_day():
 
 @app.route('/api/charts/revenue', methods=['GET'])
 def get_revenue_chart():
-    """График динамики выручки"""
     try:
         days = request.args.get('days', 30, type=int)
         chart = analytics.generate_revenue_chart(days)
@@ -146,7 +125,6 @@ def get_revenue_chart():
 
 @app.route('/api/charts/day_comparison', methods=['GET'])
 def get_day_comparison_chart():
-    """График сравнения дней недели"""
     try:
         chart = analytics.generate_day_comparison_chart()
         return jsonify({"chart": chart})
@@ -155,4 +133,4 @@ def get_day_comparison_chart():
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=False)
